@@ -1,0 +1,30 @@
+[
+  {
+    "id": "wedding-invite",
+    "title": "Wedding Invite (vellum + foil)",
+    "match": "invite",
+    "anchor": { "x": 0.42, "y": 0.44 },
+    "onClick": "pulse"
+  },
+  {
+    "id": "visiting-card",
+    "title": "Visiting Card Stack (matte)",
+    "match": "card",
+    "anchor": { "x": 0.58, "y": 0.52 },
+    "onClick": "pulse"
+  },
+  {
+    "id": "banner",
+    "title": "Large Banner Mockup (gloss)",
+    "match": "banner",
+    "anchor": { "x": 0.50, "y": 0.30 },
+    "onClick": "pulse"
+  },
+  {
+    "id": "die-cut",
+    "title": "Die-cut Paper Cards",
+    "match": "die",
+    "anchor": { "x": 0.35, "y": 0.58 },
+    "onClick": "pulse"
+  }
+]
