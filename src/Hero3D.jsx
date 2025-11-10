@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Spline from '@splinetool/react-spline'
 import { motion, useMotionValue, useSpring } from 'framer-motion'
 
@@ -15,13 +15,32 @@ function useDeviceTier() {
   return tier
 }
 
+// Simple Error Boundary to avoid blank screen if Spline throws
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(err) {
+    // no-op; could log if backend available
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback({ error: this.state.error })
+    }
+    return this.props.children
+  }
+}
+
 export default function Hero3D() {
   const tier = useDeviceTier()
+  const envDesktop = import.meta.env.VITE_SPLINE_SCENE_URL
+  const envMobile = import.meta.env.VITE_SPLINE_SCENE_URL_MOBILE
   const sceneUrl =
-    (tier === 'low'
-      ? import.meta.env.VITE_SPLINE_SCENE_URL_MOBILE
-      : import.meta.env.VITE_SPLINE_SCENE_URL) ||
-    // Fallback demo scene (replace with your published Spline URL)
+    (tier === 'low' ? envMobile : envDesktop) ||
     'https://prod.spline.design/0Yl9d3cLHDIa0nXj/scene.splinecode'
 
   const [hotspots, setHotspots] = useState([])
@@ -31,13 +50,13 @@ export default function Hero3D() {
   // Pointer ripple
   const mx = useMotionValue(0)
   const my = useMotionValue(0)
-  const smx = useSpring(mx, { stiffness: 120, damping: 20 })
+  const smtx = useSpring(mx, { stiffness: 120, damping: 20 })
   const smy = useSpring(my, { stiffness: 120, damping: 20 })
 
   useEffect(() => {
     fetch('/hotspots.json')
-      .then((r) => r.json())
-      .then((data) => setHotspots(data))
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => setHotspots(Array.isArray(data) ? data : []))
       .catch(() => setHotspots([]))
   }, [])
 
@@ -46,7 +65,6 @@ export default function Hero3D() {
     setLoaded(true)
   }
 
-  // Handle basic node click via name matching
   const onMouseDown = (e) => {
     const name = e?.target?.name?.toLowerCase?.() || ''
     const hs = hotspots.find((h) => name.includes(h.match))
@@ -65,7 +83,6 @@ export default function Hero3D() {
     }, 1200)
   }
 
-  // Confetti emitter
   const [confetti, setConfetti] = useState([])
   function emitConfetti(x, y) {
     const items = Array.from({ length: 8 }).map((_, i) => ({
@@ -106,8 +123,31 @@ export default function Hero3D() {
     [smtx, smy]
   )
 
+  const Fallback = ({ error }) => (
+    <div className="absolute inset-0 grid place-items-center text-center p-6">
+      <div>
+        <h3 className="text-lg font-semibold text-white">Interactive 3D unavailable</h3>
+        <p className="mt-2 text-white/70 text-sm">
+          {error ? 'A rendering error occurred.' : 'Waiting for scene…'}
+        </p>
+        <p className="mt-2 text-xs text-white/50 break-all">Scene URL: {sceneUrl || 'not set'}</p>
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-white/80">
+          <span className="h-2 w-2 rounded-full" style={{ background: loaded ? TEAL : '#f59e0b' }} />
+          <span>{loaded ? 'Loaded' : 'Loading…'}</span>
+          <span className="mx-2">•</span>
+          <span>Device: {tier}</span>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <section className="relative min-h-[100svh] w-full overflow-hidden" style={{ background: DEEP_BG }}>
+      {/* Status pill (debug) */}
+      <div className="pointer-events-none fixed right-3 top-3 z-[100] text-[10px] text-white/60">
+        <span className="rounded-full bg-white/5 px-2 py-1">{tier} • {sceneUrl ? 'scene set' : 'no scene'}</span>
+      </div>
+
       {/* Neon brand headline */}
       <div className="pointer-events-none absolute inset-x-0 top-8 z-20 flex items-center justify-center">
         <div className="text-center">
@@ -118,16 +158,22 @@ export default function Hero3D() {
         </div>
       </div>
 
-      {/* Spline canvas */}
+      {/* Spline canvas container */}
       <div
         className="relative mx-auto mt-24 h-[60vh] sm:h-[70vh] w-[96%] max-w-6xl rounded-3xl border border-white/5 bg-[#0d0d10] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.02)]"
         onPointerMove={handlePointerMove}
       >
         <div className="absolute inset-0">
-          <Spline scene={sceneUrl} onLoad={onLoad} onMouseDown={onMouseDown} />
+          <ErrorBoundary fallback={Fallback}>
+            <Spline
+              scene={sceneUrl}
+              onLoad={onLoad}
+              onMouseDown={onMouseDown}
+            />
+          </ErrorBoundary>
         </div>
 
-        {/* Cinematic gradient lights overlay for extra polish */}
+        {/* Cinematic gradient lights */}
         <div className="pointer-events-none absolute inset-0 mix-blend-screen opacity-70">
           <div className="absolute -left-24 top-10 h-72 w-72 rounded-full blur-3xl" style={{ background: `${TEAL}22` }} />
           <div className="absolute -right-24 bottom-10 h-72 w-72 rounded-full blur-3xl" style={{ background: `${AMBER}22` }} />
@@ -159,7 +205,7 @@ export default function Hero3D() {
           <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: 'linear-gradient(120deg, rgba(255,255,255,0.04) 10%, transparent 10%, transparent 50%, rgba(255,255,255,0.04) 50%, rgba(255,255,255,0.04) 60%, transparent 60%)', backgroundSize: '18px 18px' }} />
         </div>
 
-        {/* Interactive hotspots overlay */}
+        {/* Interactive hotspots */}
         <div className="absolute inset-0 z-20">
           <div className="relative h-full w-full">
             {hotspots.map((h) => (
